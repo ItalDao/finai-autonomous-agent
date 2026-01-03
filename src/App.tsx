@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, AlertCircle, Zap, Brain, DollarSign, CreditCard, PieChart, Lightbulb, Target, BarChart3 } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertCircle, Zap, Brain, DollarSign, CreditCard, PieChart } from 'lucide-react';
 
-//  TIPOS DE DATOS (esto es lo nuevo - le dice a TypeScript qué esperar)
+// Tipos de datos
 interface Transaction {
   id: number;
   date: string;
@@ -16,11 +16,6 @@ interface Duplicate {
   saving: number;
 }
 
-interface Insight {
-  icon: 'alert' | 'lightbulb' | 'chart' | 'target';
-  text: string;
-}
-
 interface Analysis {
   totalSpent: string;
   subscriptions: number;
@@ -29,27 +24,28 @@ interface Analysis {
     nextMonth: string;
     savings: string;
   };
-  insights: Insight[];
+  insights: string[];
   duplicates: Duplicate[];
 }
 
-// Datos de ejemplo - fuera del componente para evitar re-renders innecesarios
-const mockTransactions: Transaction[] = [
-  { id: 1, date: '2026-01-01', description: 'Netflix', amount: -15.99, category: 'Suscripción' },
-  { id: 2, date: '2026-01-01', description: 'Spotify Premium', amount: -9.99, category: 'Suscripción' },
-  { id: 3, date: '2025-12-30', description: 'Amazon Prime', amount: -14.99, category: 'Suscripción' },
-  { id: 4, date: '2025-12-29', description: 'Supermercado', amount: -85.50, category: 'Comida' },
-  { id: 5, date: '2025-12-28', description: 'Gasolina', amount: -45.00, category: 'Transporte' },
-  { id: 6, date: '2025-12-27', description: 'Disney+', amount: -10.99, category: 'Suscripción' },
-  { id: 7, date: '2025-12-26', description: 'Restaurante', amount: -67.80, category: 'Comida' },
-  { id: 8, date: '2025-12-25', description: 'Apple Music', amount: -10.99, category: 'Suscripción' },
-];
-
 const FinAIAgent = () => {
-  // qué tipo de datos van aquí
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Datos de ejemplo
+  const mockTransactions: Transaction[] = [
+    { id: 1, date: '2026-01-01', description: 'Netflix', amount: -15.99, category: 'Suscripción' },
+    { id: 2, date: '2026-01-01', description: 'Spotify Premium', amount: -9.99, category: 'Suscripción' },
+    { id: 3, date: '2025-12-30', description: 'Amazon Prime', amount: -14.99, category: 'Suscripción' },
+    { id: 4, date: '2025-12-29', description: 'Supermercado', amount: -85.50, category: 'Comida' },
+    { id: 5, date: '2025-12-28', description: 'Gasolina', amount: -45.00, category: 'Transporte' },
+    { id: 6, date: '2025-12-27', description: 'Disney+', amount: -10.99, category: 'Suscripción' },
+    { id: 7, date: '2025-12-26', description: 'Restaurante', amount: -67.80, category: 'Comida' },
+    { id: 8, date: '2025-12-25', description: 'Apple Music', amount: -10.99, category: 'Suscripción' },
+    { id: 9, date: '2025-12-24', description: 'Uber', amount: -23.50, category: 'Transporte' },
+    { id: 10, date: '2025-12-23', description: 'HBO Max', amount: -9.99, category: 'Suscripción' },
+  ];
 
   useEffect(() => {
     setTimeout(() => {
@@ -57,35 +53,45 @@ const FinAIAgent = () => {
     }, 500);
   }, []);
 
-  const analyzeFinances = () => {
+  // 🔥 FUNCIÓN ACTUALIZADA - Conecta con el backend
+  const analyzeFinances = async () => {
     setIsAnalyzing(true);
     
-    setTimeout(() => {
-      const subscriptions = transactions.filter(t => t.category === 'Suscripción');
-      const totalSubscriptions = subscriptions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      const totalSpent = transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    try {
+      console.log('📤 Enviando transacciones al backend...');
       
-      setAnalysis({
-        totalSpent: totalSpent.toFixed(2),
-        subscriptions: subscriptions.length,
-        subscriptionCost: totalSubscriptions.toFixed(2),
-        predictions: {
-          nextMonth: (totalSpent * 1.05).toFixed(2),
-          savings: (totalSubscriptions * 0.6).toFixed(2)
+      // Llamada al backend
+      const response = await fetch('http://localhost:3000/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        insights: [
-          { icon: 'alert', text: 'Tienes 4 suscripciones de streaming. ¿Realmente usas todas?' },
-          { icon: 'lightbulb', text: 'Podrías ahorrar $31.96/mes cancelando Disney+ y Apple Music' },
-          { icon: 'chart', text: 'Tus gastos en comida subieron 15% vs mes pasado' },
-          { icon: 'target', text: 'Meta: Reducir suscripciones innecesarias = $383.52/año ahorrado' }
-        ],
-        duplicates: [
-          { name: 'Streaming (Netflix, Disney+, Prime)', count: 3, saving: 25.98 },
-          { name: 'Música (Spotify, Apple Music)', count: 2, saving: 10.99 }
-        ]
+        body: JSON.stringify({
+          transactions: transactions
+        })
       });
+
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      console.log('✅ Respuesta del backend:', data);
+
+      if (data.success && data.analysis) {
+        setAnalysis(data.analysis);
+        console.log(`🧠 Análisis completado. Tokens usados: ${data.tokensUsed}`);
+      } else {
+        throw new Error('No se recibió análisis válido');
+      }
+
+    } catch (error) {
+      console.error('❌ Error al analizar:', error);
+      alert('Error al analizar las transacciones. Verifica que el servidor esté corriendo en http://localhost:3000');
+    } finally {
       setIsAnalyzing(false);
-    }, 2000);
+    }
   };
 
   const totalBalance = 2543.67;
@@ -99,8 +105,11 @@ const FinAIAgent = () => {
           <div className="flex items-center gap-3 mb-2">
             <Brain className="w-10 h-10 text-purple-400" />
             <h1 className="text-4xl font-bold text-white">FinAI Agent</h1>
+            <span className="bg-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full">
+              🔴 LIVE GPT-4
+            </span>
           </div>
-          <p className="text-gray-400">Tu asistente financiero autónomo con IA</p>
+          <p className="text-gray-400">Tu asistente financiero autónomo con IA real</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -147,7 +156,7 @@ const FinAIAgent = () => {
             className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Zap className={`w-6 h-6 ${isAnalyzing ? 'animate-pulse' : ''}`} />
-            {isAnalyzing ? 'Analizando tus finanzas con IA...' : 'Analizar con IA'}
+            {isAnalyzing ? 'Analizando con GPT-4...' : '🧠 Analizar con GPT-4 Real'}
           </button>
         </div>
 
@@ -157,27 +166,14 @@ const FinAIAgent = () => {
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
               <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                 <Brain className="w-6 h-6 text-purple-400" />
-                Insights de IA
+                Insights de GPT-4
               </h3>
               <div className="space-y-3">
-                {analysis.insights.map((insight, idx) => {
-                  const getIcon = () => {
-                    switch(insight.icon) {
-                      case 'alert': return <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />;
-                      case 'lightbulb': return <Lightbulb className="w-5 h-5 text-yellow-400 flex-shrink-0" />;
-                      case 'chart': return <BarChart3 className="w-5 h-5 text-blue-400 flex-shrink-0" />;
-                      case 'target': return <Target className="w-5 h-5 text-green-400 flex-shrink-0" />;
-                      default: return null;
-                    }
-                  };
-                  
-                  return (
-                    <div key={idx} className="bg-white/5 rounded-lg p-4 text-gray-300 flex gap-3">
-                      {getIcon()}
-                      <span>{insight.text}</span>
-                    </div>
-                  );
-                })}
+                {analysis.insights.map((insight, idx) => (
+                  <div key={idx} className="bg-white/5 rounded-lg p-4 text-gray-300">
+                    {insight}
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -206,9 +202,8 @@ const FinAIAgent = () => {
               </div>
 
               <div className="mt-4 bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-                <p className="text-green-400 font-semibold flex items-center gap-2">
-                  <DollarSign className="w-5 h-5" />
-                  Ahorro potencial: ${analysis.predictions.savings}/mes
+                <p className="text-green-400 font-semibold">
+                  💰 Ahorro potencial: ${analysis.predictions.savings}/mes
                 </p>
                 <p className="text-gray-400 text-sm mt-1">
                   = ${(parseFloat(analysis.predictions.savings) * 12).toFixed(2)}/año
