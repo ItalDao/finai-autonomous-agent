@@ -2,10 +2,10 @@
 // IMPORTACIONES
 // ====================================
 import express from 'express';
-import type { Request, Response } from 'express'; //  Type-only import
+import type { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import OpenAI from 'openai';
+import Groq from 'groq-sdk';
 
 dotenv.config();
 
@@ -15,8 +15,17 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+//  MODO DEMO: Si no hay API key o DEMO_MODE=true, usa simulación
+const DEMO_MODE = !process.env.GROQ_API_KEY || process.env.DEMO_MODE === 'true';
+
+// Debug
+console.log(' Configuración:');
+console.log('  Groq API Key:', process.env.GROQ_API_KEY ? ' Configurada' : ' No configurada');
+console.log('  DEMO_MODE variable:', process.env.DEMO_MODE);
+console.log('  DEMO_MODE activo:', DEMO_MODE);
+
+const groq = DEMO_MODE ? null : new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 // ====================================
@@ -49,18 +58,19 @@ interface AnalyzeRequest {
 // ====================================
 app.get('/', (req: Request, res: Response) => {
   res.json({ 
-    message: 'FinAI Server is running!',
+    message: ' FinAI Server is running!',
     status: 'OK',
+    mode: DEMO_MODE ? 'demo' : 'groq',
     timestamp: new Date().toISOString()
   });
 });
 
 // ====================================
-// RUTA DE ANÁLISIS CON GPT-4
+// RUTA DE ANÁLISIS CON IA
 // ====================================
 app.post('/api/analyze', async (req: Request, res: Response) => {
   try {
-    const { transactions } = req.body as AnalyzeRequest; // Type assertion
+    const { transactions } = req.body as AnalyzeRequest;
 
     console.log(' Analizando transacciones:', transactions.length);
 
@@ -70,7 +80,6 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
       });
     }
 
-    // Prepara el prompt para GPT-4
     const prompt = `
 Eres un asesor financiero experto. Analiza estas transacciones y proporciona:
 
@@ -111,36 +120,76 @@ FORMATO DE RESPUESTA (JSON estricto):
 RESPONDE ÚNICAMENTE CON EL JSON, SIN TEXTO ADICIONAL.
 `;
 
-    console.log(' Enviando a GPT-4o-mini...');
-    
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "Eres un asesor financiero experto. Siempre respondes en JSON válido."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 1000,
-    });
+    let aiResponse: string;
+    let tokensUsed = 0;
 
-    //  Acceso seguro con validación
-    const aiResponse = completion.choices[0]?.message?.content;
-    
-    if (!aiResponse) {
-      console.error('No se recibió respuesta de la IA');
-      return res.status(500).json({ 
-        error: 'La IA no generó una respuesta',
-        details: 'Empty response from OpenAI'
+    //  MODO DEMO - Análisis simulado inteligente
+    if (DEMO_MODE) {
+      console.log(' MODO DEMO - Generando análisis simulado...');
+      
+      const subscriptions = transactions.filter(t => t.category === 'Suscripción');
+      const totalSpent = Math.abs(transactions.reduce((sum, t) => sum + t.amount, 0));
+      const subscriptionCost = Math.abs(subscriptions.reduce((sum, t) => sum + t.amount, 0));
+      
+      aiResponse = JSON.stringify({
+        totalSpent: totalSpent.toFixed(2),
+        subscriptions: subscriptions.length,
+        subscriptionCost: subscriptionCost.toFixed(2),
+        predictions: {
+          nextMonth: (totalSpent * 1.05).toFixed(2),
+          savings: (subscriptionCost * 0.4).toFixed(2)
+        },
+        insights: [
+          ` Detecté ${subscriptions.length} suscripciones activas por $${subscriptionCost.toFixed(2)}/mes`,
+          ` Podrías ahorrar ${((subscriptionCost * 0.4 / totalSpent) * 100).toFixed(0)}% cancelando servicios que no usas`,
+          ` Tu gasto mensual proyectado es $${(totalSpent * 1.05).toFixed(2)} si continúas así`,
+          ` Recomiendo revisar suscripciones duplicadas de streaming y música`
+        ],
+        duplicates: [
+          {
+            name: subscriptions.length > 2 ? 'Servicios de Streaming' : 'Suscripciones',
+            count: subscriptions.length,
+            saving: parseFloat((subscriptionCost * 0.4).toFixed(2))
+          }
+        ]
       });
+      tokensUsed = 0;
+      
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+    } else {
+      //  MODO REAL - GROQ (Llama 3.1)
+      console.log(' Enviando a Groq (Llama 3.1)...');
+      
+      const completion = await groq!.chat.completions.create({
+        model: "llama-3.3-70b-versatile", //  Modelo actualizado (Enero 2026)
+        messages: [
+          {
+            role: "system",
+            content: "Eres un asesor financiero experto. Siempre respondes en JSON válido sin markdown ni texto adicional."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
+
+      aiResponse = completion.choices[0]?.message?.content || '';
+      tokensUsed = completion.usage?.total_tokens || 0;
+      
+      if (!aiResponse) {
+        console.error(' No se recibió respuesta de la IA');
+        return res.status(500).json({ 
+          error: 'La IA no generó una respuesta',
+          details: 'Empty response from Groq'
+        });
+      }
     }
 
-    console.log(' Respuesta de GPT-4o-mini:', aiResponse);
+    console.log(DEMO_MODE ? ' Análisis demo completado' : ' Respuesta de Groq recibida');
 
     // Parsea el JSON
     let analysis;
@@ -149,6 +198,7 @@ RESPONDE ÚNICAMENTE CON EL JSON, SIN TEXTO ADICIONAL.
       analysis = JSON.parse(cleanedResponse);
     } catch (parseError) {
       console.error(' Error parseando JSON:', parseError);
+      console.error('Respuesta cruda:', aiResponse);
       return res.status(500).json({ 
         error: 'Error al procesar la respuesta de la IA',
         details: aiResponse 
@@ -159,11 +209,12 @@ RESPONDE ÚNICAMENTE CON EL JSON, SIN TEXTO ADICIONAL.
     res.json({
       success: true,
       analysis,
-      tokensUsed: completion.usage?.total_tokens || 0
+      tokensUsed,
+      mode: DEMO_MODE ? 'demo' : 'groq',
+      model: DEMO_MODE ? 'simulation' : 'llama-3.3-70b-versatile'
     });
 
   } catch (error) {
-    //  Type guard para error
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
     console.error(' Error en el análisis:', error);
     res.status(500).json({ 
@@ -178,7 +229,10 @@ RESPONDE ÚNICAMENTE CON EL JSON, SIN TEXTO ADICIONAL.
 // ====================================
 app.listen(PORT, () => {
   console.log(`
- Server running on http://localhost:${PORT}
- API endpoint: http://localhost:${PORT}/api/analyze
+ FinAI Server corriendo
+ Puerto: ${PORT}
+ URL: http://localhost:${PORT}
+ API: http://localhost:${PORT}/api/analyze
+${DEMO_MODE ? ' MODO DEMO ACTIVADO (sin IA)' : ' MODO GROQ ACTIVADO (Llama 3.1)'}
   `);
 });
