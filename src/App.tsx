@@ -13,13 +13,15 @@ import {
   AlertTriangle,
   Target,
   TrendingUpIcon,
-  Music,
   Tv,
-  ShoppingCart,
   Car,
-  Coffee
+  Coffee,
+  History,
+  Database
 } from 'lucide-react';
 import FinancialCharts from './components/FinancialCharts';
+
+const API_URL = 'http://localhost:3000';
 
 // Tipos de datos
 interface Transaction {
@@ -52,6 +54,7 @@ const FinAIAgent = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
 
   // Estados del formulario
@@ -62,69 +65,112 @@ const FinAIAgent = () => {
     date: new Date().toISOString().split('T')[0]
   });
 
-  // Datos de ejemplo
-  const mockTransactions: Transaction[] = [
-    { id: 1, date: '2026-01-01', description: 'Netflix', amount: -15.99, category: 'Suscripción' },
-    { id: 2, date: '2026-01-01', description: 'Spotify Premium', amount: -9.99, category: 'Suscripción' },
-    { id: 3, date: '2025-12-30', description: 'Amazon Prime', amount: -14.99, category: 'Suscripción' },
-    { id: 4, date: '2025-12-29', description: 'Supermercado', amount: -85.50, category: 'Comida' },
-    { id: 5, date: '2025-12-28', description: 'Gasolina', amount: -45.00, category: 'Transporte' },
-    { id: 6, date: '2025-12-27', description: 'Disney+', amount: -10.99, category: 'Suscripción' },
-    { id: 7, date: '2025-12-26', description: 'Restaurante', amount: -67.80, category: 'Comida' },
-    { id: 8, date: '2025-12-25', description: 'Apple Music', amount: -10.99, category: 'Suscripción' },
-    { id: 9, date: '2025-12-24', description: 'Uber', amount: -23.50, category: 'Transporte' },
-    { id: 10, date: '2025-12-23', description: 'HBO Max', amount: -9.99, category: 'Suscripción' },
-  ];
-
+  //  CARGAR TRANSACCIONES DESDE LA DB
   useEffect(() => {
-    setTimeout(() => {
-      setTransactions(mockTransactions);
-    }, 500);
+    loadTransactions();
   }, []);
 
-  // Agregar nueva transacción
-  const handleAddTransaction = () => {
+  const loadTransactions = async () => {
+    try {
+      setIsLoading(true);
+      console.log('📥 Cargando transacciones desde la DB...');
+      
+      const response = await fetch(`${API_URL}/api/transactions`);
+      const data = await response.json();
+
+      if (data.success) {
+        setTransactions(data.transactions);
+        console.log('✅ Transacciones cargadas:', data.transactions.length);
+      }
+    } catch (error) {
+      console.error('❌ Error cargando transacciones:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  //  AGREGAR TRANSACCIÓN A LA DB
+  const handleAddTransaction = async () => {
     if (!newTransaction.description || !newTransaction.amount) {
       alert('Por favor completa todos los campos');
       return;
     }
 
-    const transaction: Transaction = {
-      id: Date.now(),
-      date: newTransaction.date,
-      description: newTransaction.description,
-      amount: -Math.abs(parseFloat(newTransaction.amount)),
-      category: newTransaction.category
-    };
+    try {
+      console.log('💾 Guardando transacción en DB...');
 
-    setTransactions([transaction, ...transactions]);
-    
-    // Resetear formulario
-    setNewTransaction({
-      description: '',
-      amount: '',
-      category: 'Suscripción',
-      date: new Date().toISOString().split('T')[0]
-    });
-    
-    setShowAddForm(false);
-  };
+      const response = await fetch(`${API_URL}/api/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          description: newTransaction.description,
+          amount: -Math.abs(parseFloat(newTransaction.amount)),
+          category: newTransaction.category,
+          date: newTransaction.date
+        })
+      });
 
-  // Eliminar transacción
-  const handleDeleteTransaction = (id: number) => {
-    if (confirm('¿Seguro que quieres eliminar esta transacción?')) {
-      setTransactions(transactions.filter(t => t.id !== id));
+      const data = await response.json();
+
+      if (data.success) {
+        console.log('✅ Transacción guardada:', data.transaction.id);
+        
+        // Recargar transacciones
+        await loadTransactions();
+        
+        // Resetear formulario
+        setNewTransaction({
+          description: '',
+          amount: '',
+          category: 'Suscripción',
+          date: new Date().toISOString().split('T')[0]
+        });
+        
+        setShowAddForm(false);
+      }
+    } catch (error) {
+      console.error('❌ Error guardando transacción:', error);
+      alert('Error al guardar la transacción');
     }
   };
 
-  // Análisis con IA
+  //  ELIMINAR TRANSACCIÓN DE LA DB
+  const handleDeleteTransaction = async (id: number) => {
+    if (!confirm('¿Seguro que quieres eliminar esta transacción?')) {
+      return;
+    }
+
+    try {
+      console.log(' Eliminando transacción:', id);
+
+      const response = await fetch(`${API_URL}/api/transactions/${id}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        console.log('Transacción eliminada');
+        
+        // Recargar transacciones
+        await loadTransactions();
+      }
+    } catch (error) {
+      console.error(' Error eliminando transacción:', error);
+      alert('Error al eliminar la transacción');
+    }
+  };
+
+  //  ANÁLISIS CON IA (se guarda automáticamente en DB)
   const analyzeFinances = async () => {
     setIsAnalyzing(true);
     
     try {
       console.log('📤 Enviando transacciones al backend...');
       
-      const response = await fetch('http://localhost:3000/api/analyze', {
+      const response = await fetch(`${API_URL}/api/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -140,18 +186,18 @@ const FinAIAgent = () => {
 
       const data = await response.json();
       
-      console.log('✅ Respuesta del backend:', data);
+      console.log(' Respuesta del backend:', data);
+      console.log('Análisis guardado en DB con ID:', data.savedId);
 
       if (data.success && data.analysis) {
         setAnalysis(data.analysis);
-        console.log(`🧠 Análisis completado. Tokens usados: ${data.tokensUsed}`);
       } else {
         throw new Error('No se recibió análisis válido');
       }
 
     } catch (error) {
-      console.error('❌ Error al analizar:', error);
-      alert('Error al analizar las transacciones. Verifica que el servidor esté corriendo en http://localhost:3000');
+      console.error(' Error al analizar:', error);
+      alert('Error al analizar las transacciones');
     } finally {
       setIsAnalyzing(false);
     }
@@ -164,13 +210,13 @@ const FinAIAgent = () => {
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'Suscripción':
-        return <Tv className="w-4 h-4" />;
+        return <Tv className="w-4 h-4 text-purple-400" />;
       case 'Comida':
-        return <Coffee className="w-4 h-4" />;
+        return <Coffee className="w-4 h-4 text-orange-400" />;
       case 'Transporte':
-        return <Car className="w-4 h-4" />;
+        return <Car className="w-4 h-4 text-blue-400" />;
       default:
-        return <ShoppingCart className="w-4 h-4" />;
+        return <DollarSign className="w-4 h-4 text-green-400" />;
     }
   };
 
@@ -184,10 +230,16 @@ const FinAIAgent = () => {
             <div className="flex items-center gap-3">
               <Brain className="w-10 h-10 text-purple-400" />
               <h1 className="text-4xl font-bold text-white">Agente FinAI</h1>
-              <span className="bg-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full flex items-center gap-1">
-                <Zap className="w-3 h-3" />
-                GROQ AI
-              </span>
+              <div className="flex gap-2">
+                <span className="bg-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full flex items-center gap-1">
+                  <Zap className="w-3 h-3" />
+                  GROQ AI
+                </span>
+                <span className="bg-blue-500/20 text-blue-400 text-xs px-3 py-1 rounded-full flex items-center gap-1">
+                  <Database className="w-3 h-3" />
+                  SQLite
+                </span>
+              </div>
             </div>
             <button
               onClick={() => setShowAddForm(!showAddForm)}
@@ -197,12 +249,12 @@ const FinAIAgent = () => {
               Nueva Transacción
             </button>
           </div>
-          <p className="text-gray-400">Tu asistente financiero autónomo con IA real</p>
+          <p className="text-gray-400">Tu asistente financiero autónomo con IA real + Base de datos persistente</p>
         </div>
 
         {/* Formulario para agregar transacción */}
         {showAddForm && (
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 mb-8">
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 mb-8 animate-in fade-in duration-300">
             <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
               <Plus className="w-6 h-6 text-purple-400" />
               Agregar Transacción
@@ -213,19 +265,19 @@ const FinAIAgent = () => {
                 placeholder="Descripción (ej: Netflix)"
                 value={newTransaction.description}
                 onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
-                className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 transition-colors"
               />
               <input
                 type="number"
                 placeholder="Monto (ej: 15.99)"
                 value={newTransaction.amount}
                 onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})}
-                className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 transition-colors"
               />
               <select
                 value={newTransaction.category}
                 onChange={(e) => setNewTransaction({...newTransaction, category: e.target.value})}
-                className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500"
+                className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
               >
                 <option value="Suscripción">Suscripción</option>
                 <option value="Comida">Comida</option>
@@ -237,7 +289,7 @@ const FinAIAgent = () => {
                 type="date"
                 value={newTransaction.date}
                 onChange={(e) => setNewTransaction({...newTransaction, date: e.target.value})}
-                className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500"
+                className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
               />
             </div>
             <div className="flex gap-3 mt-4">
@@ -246,7 +298,7 @@ const FinAIAgent = () => {
                 className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
-                Agregar
+                Guardar en DB
               </button>
               <button
                 onClick={() => setShowAddForm(false)}
@@ -300,7 +352,7 @@ const FinAIAgent = () => {
         <div className="mb-8">
           <button
             onClick={analyzeFinances}
-            disabled={isAnalyzing || transactions.length === 0}
+            disabled={isAnalyzing || transactions.length === 0 || isLoading}
             className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Zap className={`w-6 h-6 ${isAnalyzing ? 'animate-pulse' : ''}`} />
@@ -309,8 +361,16 @@ const FinAIAgent = () => {
         </div>
 
         {/* Gráficos */}
-        {transactions.length > 0 && (
+        {transactions.length > 0 && !isLoading && (
           <FinancialCharts transactions={transactions} />
+        )}
+
+        {/* Loading state */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+            <p className="text-gray-400 ml-4">Cargando desde la base de datos...</p>
+          </div>
         )}
 
         {/* Análisis de IA */}
@@ -373,9 +433,18 @@ const FinAIAgent = () => {
         {/* Transacciones */}
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
           <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <PieChart className="w-6 h-6 text-blue-400" />
-            Transacciones Recientes
+            <History className="w-6 h-6 text-blue-400" />
+            Transacciones desde la Base de Datos ({transactions.length})
           </h3>
+          
+          {transactions.length === 0 && !isLoading && (
+            <div className="text-center py-12">
+              <Database className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-400">No hay transacciones aún</p>
+              <p className="text-gray-500 text-sm mt-2">Agrega tu primera transacción para comenzar</p>
+            </div>
+          )}
+
           <div className="space-y-2">
             {transactions.map((tx) => (
               <div 
@@ -398,6 +467,7 @@ const FinAIAgent = () => {
                   <button
                     onClick={() => handleDeleteTransaction(tx.id)}
                     className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-all"
+                    title="Eliminar de la base de datos"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
