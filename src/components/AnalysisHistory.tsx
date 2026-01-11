@@ -194,7 +194,7 @@ const AnalysisHistory = () => {
                           </div>
                           <span className="bg-red-500 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
                             <DollarSign className="w-3 h-3" />
-                            {dup.saving.toFixed(2)}/mes
+                            ${parseFloat(String(dup.saving)).toFixed(2)}/mes
                           </span>
                         </div>
                       ))}
