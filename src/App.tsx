@@ -20,6 +20,7 @@ import {
   Database
 } from 'lucide-react';
 import FinancialCharts from './components/FinancialCharts';
+import AnalysisHistory from './components/AnalysisHistory';
 
 const API_URL = 'http://localhost:3000';
 
@@ -372,6 +373,9 @@ const FinAIAgent = () => {
             <p className="text-gray-400 ml-4">Cargando desde la base de datos...</p>
           </div>
         )}
+
+        {/* Historial de análisis */}
+        <AnalysisHistory />
 
         {/* Análisis de IA */}
         {analysis && (
