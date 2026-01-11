@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+//  Modelo de Transacción
+model Transaction {
+  id          Int      @id @default(autoincrement())
+  description String
+  amount      Float
+  category    String
+  date        DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relación con análisis
+  analysisId  Int?
+  analysis    Analysis? @relation(fields: [analysisId], references: [id])
+}
+
+//   Modelo de Análisis (guardado de IA)
+model Analysis {
+  id                Int      @id @default(autoincrement())
+  totalSpent        Float
+  subscriptions     Int
+  subscriptionCost  Float
+  predictedNext     Float
+  savingsPotential  Float
+  insights          String   // JSON stringificado
+  duplicates        String   // JSON stringificado
+  tokensUsed        Int      @default(0)
+  model             String   @default("groq")
+  createdAt         DateTime @default(now())
+  
+  // Relación con transacciones
+  transactions      Transaction[]
+}
+
+//  Modelo de Categorías (opcional, para extender)
+model Category {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  icon  String
+  color String
+}
