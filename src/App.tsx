@@ -23,6 +23,8 @@ import {
 import FinancialCharts from './components/FinancialCharts';
 import AnalysisHistory from './components/AnalysisHistory';
 import EnhancedWidgets from './components/EnhancedWidgets';
+import FinancialGoals from './components/FinancialGoals';
+import TemporalComparison from './components/TemporalComparison';
 import { ToastContainer } from './components/Toast';
 import { showToast } from './utils/toast';
 import { useTheme } from './hooks/useTheme';
@@ -165,7 +167,7 @@ const FinAIAgent = () => {
         setAnalysis(data.analysis);
         showToast('Análisis completado con IA', 'success');
       }
-    } catch (error) {
+    } catch {
       showToast('Error al analizar', 'error');
     } finally {
       setIsAnalyzing(false);
@@ -358,6 +360,16 @@ const FinAIAgent = () => {
         {/* Historial */}
         <div className="mb-8">
           <AnalysisHistory />
+        </div>
+
+        {/* Metas Financieras */}
+        <div className="mb-8">
+          <FinancialGoals transactions={transactions} />
+        </div>
+
+        {/* Análisis Temporal */}
+        <div className="mb-8">
+          <TemporalComparison transactions={transactions} />
         </div>
 
         {/* Análisis IA */}
