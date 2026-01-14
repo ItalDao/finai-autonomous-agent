@@ -60,13 +60,14 @@ export const ToastContainer = () => {
 
   useEffect(() => {
     // Escucha eventos personalizados de toast
-    const handleToast = (event: CustomEvent<Omit<ToastItem, 'id'>>) => {
+    const handleToast = (event: Event) => {
+      const customEvent = event as CustomEvent<Omit<ToastItem, 'id'>>;
       const id = Math.random().toString(36).substr(2, 9);
-      setToasts(prev => [...prev, { id, ...event.detail }]);
+      setToasts(prev => [...prev, { id, ...customEvent.detail }]);
     };
 
-    window.addEventListener('show-toast' as any, handleToast);
-    return () => window.removeEventListener('show-toast' as any, handleToast);
+    window.addEventListener('show-toast', handleToast);
+    return () => window.removeEventListener('show-toast', handleToast);
   }, []);
 
   const removeToast = (id: string) => {
@@ -89,12 +90,4 @@ export const ToastContainer = () => {
       </div>
     </div>
   );
-};
-
-// Helper para mostrar toasts desde cualquier componente
-export const showToast = (message: string, type: ToastType = 'info', duration?: number) => {
-  const event = new CustomEvent('show-toast', {
-    detail: { message, type, duration }
-  });
-  window.dispatchEvent(event);
 };
