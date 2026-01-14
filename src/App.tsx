@@ -18,7 +18,8 @@ import {
   History,
   Database,
   Moon,
-  Sun
+  Sun,
+  Download
 } from 'lucide-react';
 import FinancialCharts from './components/FinancialCharts';
 import AnalysisHistory from './components/AnalysisHistory';
@@ -27,6 +28,7 @@ import FinancialGoals from './components/FinancialGoals';
 import TemporalComparison from './components/TemporalComparison';
 import { ToastContainer } from './components/Toast';
 import { showToast } from './utils/toast';
+import { exportFinancialAnalysisToPDF } from './utils/pdf';
 import { useTheme } from './hooks/useTheme';
 
 const API_URL = 'http://localhost:3000';
@@ -171,6 +173,25 @@ const FinAIAgent = () => {
       showToast('Error al analizar', 'error');
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!analysis) {
+      showToast('Realiza un análisis primero', 'warning');
+      return;
+    }
+
+    try {
+      await exportFinancialAnalysisToPDF(
+        analysis,
+        transactions,
+        `analisis-financiero-${new Date().toISOString().split('T')[0]}.pdf`
+      );
+      showToast('PDF exportado', 'success');
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      showToast('Error al exportar PDF', 'error');
     }
   };
 
@@ -332,15 +353,25 @@ const FinAIAgent = () => {
           </div>
         </div>
 
-        {/* Botón análisis */}
-        <div className="mb-8">
+        {/* Botones */}
+        <div className="mb-8 flex flex-col sm:flex-row gap-3">
           <button
             onClick={analyzeFinances}
             disabled={isAnalyzing || transactions.length === 0 || isLoading}
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 dark:from-purple-500 dark:to-pink-500 dark:hover:from-purple-600 dark:hover:to-pink-600 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 dark:from-purple-500 dark:to-pink-500 dark:hover:from-purple-600 dark:hover:to-pink-600 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Zap className={`w-6 h-6 ${isAnalyzing ? 'animate-pulse' : ''}`} />
             {isAnalyzing ? 'Analizando con IA...' : 'Analizar con IA'}
+          </button>
+
+          <button
+            onClick={handleExportPDF}
+            disabled={!analysis || isLoading}
+            className="bg-white/10 dark:bg-white/5 backdrop-blur-lg border border-white/20 dark:border-white/10 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all hover:bg-white/15 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Exportar análisis a PDF"
+          >
+            <Download className="w-6 h-6" />
+            Exportar PDF
           </button>
         </div>
 
