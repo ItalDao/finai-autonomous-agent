@@ -8,27 +8,20 @@ import {
   DollarSign, 
   CreditCard, 
   Plus,
-  Trash2,
   AlertTriangle,
   Target,
   TrendingUpIcon,
-  Tv,
-  Car,
-  Coffee,
   History,
   Database,
   Moon,
-  Sun,
-  Download
+  Sun
 } from 'lucide-react';
 import FinancialCharts from './components/FinancialCharts';
 import AnalysisHistory from './components/AnalysisHistory';
 import EnhancedWidgets from './components/EnhancedWidgets';
-import FinancialGoals from './components/FinancialGoals';
-import TemporalComparison from './components/TemporalComparison';
+import TransactionManager from './components/TransactionManager';
 import { ToastContainer } from './components/Toast';
 import { showToast } from './utils/toast';
-import { exportFinancialAnalysisToPDF } from './utils/pdf';
 import { useTheme } from './hooks/useTheme';
 
 const API_URL = 'http://localhost:3000';
@@ -88,8 +81,8 @@ const FinAIAgent = () => {
         setTransactions(data.transactions);
         showToast(`${data.transactions.length} transacciones cargadas`, 'success');
       }
-    } catch {
-      console.error('❌ Error al cargar transacciones');
+    } catch (error) {
+      console.error('❌ Error:', error);
       showToast('Error al cargar transacciones', 'error');
     } finally {
       setIsLoading(false);
@@ -132,25 +125,6 @@ const FinAIAgent = () => {
     }
   };
 
-  const handleDeleteTransaction = async (id: number) => {
-    if (!confirm('¿Eliminar esta transacción?')) return;
-
-    try {
-      const response = await fetch(`${API_URL}/api/transactions/${id}`, {
-        method: 'DELETE'
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        await loadTransactions();
-        showToast('Transacción eliminada', 'info');
-      }
-    } catch {
-      showToast('Error al eliminar', 'error');
-    }
-  };
-
   const analyzeFinances = async () => {
     setIsAnalyzing(true);
     
@@ -176,36 +150,10 @@ const FinAIAgent = () => {
     }
   };
 
-  const handleExportPDF = async () => {
-    if (!analysis) {
-      showToast('Realiza un análisis primero', 'warning');
-      return;
-    }
-
-    try {
-      await exportFinancialAnalysisToPDF(
-        analysis,
-        transactions,
-        `analisis-financiero-${new Date().toISOString().split('T')[0]}.pdf`
-      );
-      showToast('PDF exportado', 'success');
-    } catch (error) {
-      console.error('Error al exportar PDF:', error);
-      showToast('Error al exportar PDF', 'error');
-    }
-  };
-
-  const totalBalance = 2543.67;
-  const monthlyIncome = 3500.00;
-
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'Suscripción': return <Tv className="w-4 h-4 text-purple-400" />;
-      case 'Comida': return <Coffee className="w-4 h-4 text-orange-400" />;
-      case 'Transporte': return <Car className="w-4 h-4 text-blue-400" />;
-      default: return <DollarSign className="w-4 h-4 text-green-400" />;
-    }
-  };
+  // Calcular datos reales desde transacciones
+  const totalSpent = Math.abs(transactions.reduce((sum, t) => sum + t.amount, 0));
+  const monthlyIncome = 3500.00; // Esto lo puede configurar el usuario después
+  const totalBalance = monthlyIncome - totalSpent;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6 transition-colors duration-300">
@@ -319,13 +267,13 @@ const FinAIAgent = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white/10 dark:bg-white/5 backdrop-blur-lg rounded-2xl p-6 border border-white/20 dark:border-white/10">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-400 dark:text-gray-500">Balance Total</span>
+              <span className="text-gray-400 dark:text-gray-500">Balance Disponible</span>
               <DollarSign className="w-5 h-5 text-green-400 dark:text-green-300" />
             </div>
-            <p className="text-3xl font-bold text-white dark:text-gray-100">${totalBalance}</p>
-            <p className="text-green-400 dark:text-green-300 text-sm mt-2 flex items-center gap-1">
-              <TrendingUp className="w-4 h-4" />
-              +12.5% este mes
+            <p className="text-3xl font-bold text-white dark:text-gray-100">${totalBalance.toFixed(2)}</p>
+            <p className={`text-sm mt-2 flex items-center gap-1 ${totalBalance > 0 ? 'text-green-400 dark:text-green-300' : 'text-red-400 dark:text-red-300'}`}>
+              {totalBalance > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+              {totalBalance > 0 ? 'Positivo' : 'Negativo'}
             </p>
           </div>
 
@@ -344,7 +292,7 @@ const FinAIAgent = () => {
               <CreditCard className="w-5 h-5 text-red-400 dark:text-red-300" />
             </div>
             <p className="text-3xl font-bold text-white dark:text-gray-100">
-              ${analysis ? analysis.totalSpent : '...'} 
+              ${analysis ? analysis.totalSpent : totalSpent.toFixed(2)} 
             </p>
             <p className="text-red-400 dark:text-red-300 text-sm mt-2 flex items-center gap-1">
               <TrendingDown className="w-4 h-4" />
@@ -353,25 +301,15 @@ const FinAIAgent = () => {
           </div>
         </div>
 
-        {/* Botones */}
-        <div className="mb-8 flex flex-col sm:flex-row gap-3">
+        {/* Botón análisis */}
+        <div className="mb-8">
           <button
             onClick={analyzeFinances}
             disabled={isAnalyzing || transactions.length === 0 || isLoading}
-            className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 dark:from-purple-500 dark:to-pink-500 dark:hover:from-purple-600 dark:hover:to-pink-600 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 dark:from-purple-500 dark:to-pink-500 dark:hover:from-purple-600 dark:hover:to-pink-600 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Zap className={`w-6 h-6 ${isAnalyzing ? 'animate-pulse' : ''}`} />
             {isAnalyzing ? 'Analizando con IA...' : 'Analizar con IA'}
-          </button>
-
-          <button
-            onClick={handleExportPDF}
-            disabled={!analysis || isLoading}
-            className="bg-white/10 dark:bg-white/5 backdrop-blur-lg border border-white/20 dark:border-white/10 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all hover:bg-white/15 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Exportar análisis a PDF"
-          >
-            <Download className="w-6 h-6" />
-            Exportar PDF
           </button>
         </div>
 
@@ -391,16 +329,6 @@ const FinAIAgent = () => {
         {/* Historial */}
         <div className="mb-8">
           <AnalysisHistory />
-        </div>
-
-        {/* Metas Financieras */}
-        <div className="mb-8">
-          <FinancialGoals transactions={transactions} />
-        </div>
-
-        {/* Análisis Temporal */}
-        <div className="mb-8">
-          <TemporalComparison transactions={transactions} />
         </div>
 
         {/* Análisis IA */}
@@ -459,49 +387,20 @@ const FinAIAgent = () => {
           </div>
         )}
 
-        {/* Transacciones */}
+        {/* Transacciones con búsqueda y filtros */}
         <div className="bg-white/10 dark:bg-white/5 backdrop-blur-lg rounded-2xl p-6 border border-white/20 dark:border-white/10">
           <h3 className="text-xl font-bold text-white dark:text-gray-100 mb-4 flex items-center gap-2">
             <History className="w-6 h-6 text-blue-400 dark:text-blue-300" />
             Transacciones ({transactions.length})
           </h3>
           
-          {transactions.length === 0 && !isLoading && (
-            <div className="text-center py-12">
-              <Database className="w-16 h-16 text-gray-600 dark:text-gray-700 mx-auto mb-4" />
-              <p className="text-gray-400 dark:text-gray-500">No hay transacciones</p>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
             </div>
+          ) : (
+            <TransactionManager transactions={transactions} onUpdate={loadTransactions} />
           )}
-
-          <div className="space-y-2">
-            {transactions.map((tx) => (
-              <div 
-                key={tx.id} 
-                className="flex items-center justify-between bg-white/5 dark:bg-white/3 hover:bg-white/10 dark:hover:bg-white/5 rounded-lg p-4 transition-colors group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="bg-purple-500/20 dark:bg-purple-500/10 p-2 rounded-lg">
-                    {getCategoryIcon(tx.category)}
-                  </div>
-                  <div>
-                    <p className="text-white dark:text-gray-100 font-semibold">{tx.description}</p>
-                    <p className="text-gray-400 dark:text-gray-500 text-sm">{tx.date} • {tx.category}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`font-bold ${tx.amount < 0 ? 'text-red-400 dark:text-red-300' : 'text-green-400 dark:text-green-300'}`}>
-                    ${Math.abs(tx.amount).toFixed(2)}
-                  </span>
-                  <button
-                    onClick={() => handleDeleteTransaction(tx.id)}
-                    className="opacity-0 group-hover:opacity-100 text-red-400 dark:text-red-300 hover:text-red-300 dark:hover:text-red-200 transition-all"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
 
       </div>

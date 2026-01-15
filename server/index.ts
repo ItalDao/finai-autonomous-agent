@@ -172,6 +172,43 @@ app.delete('/api/transactions/:id', async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/transactions/:id - Actualizar transacción
+app.put('/api/transactions/:id', async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { description, amount, category, date } = req.body;
+
+    const transaction = await prisma.transaction.update({
+      where: { id },
+      data: {
+        description,
+        amount: parseFloat(amount),
+        category,
+        date: new Date(date)
+      }
+    });
+
+    console.log('✅ Transacción actualizada:', id);
+
+    res.json({
+      success: true,
+      transaction: {
+        id: transaction.id,
+        description: transaction.description,
+        amount: transaction.amount,
+        category: transaction.category,
+        date: transaction.date.toISOString().split('T')[0]
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error actualizando transacción:', error);
+    res.status(500).json({
+      error: 'Error al actualizar transacción',
+      details: error instanceof Error ? error.message : 'Error desconocido'
+    });
+  }
+});
+
 // GET /api/analyses - Obtener historial de análisis
 app.get('/api/analyses', async (req: Request, res: Response) => {
   try {
