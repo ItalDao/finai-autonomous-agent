@@ -28,8 +28,24 @@ const groq = DEMO_MODE ? null : new Groq({
 // ====================================
 // MIDDLEWARES
 // ====================================
+const configuredFrontendOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || 'http://localhost:5173')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Allow non-browser clients (curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    // Explicit allow-list via env
+    if (configuredFrontendOrigins.includes(origin)) return callback(null, true);
+
+    // Dev: allow any localhost/127.0.0.1 port (Vite may use 5173, 5174, etc.)
+    if (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) return callback(null, true);
+
+    return callback(new Error(`Not allowed by CORS: ${origin}`));
+  },
   credentials: true,
 }));
 
